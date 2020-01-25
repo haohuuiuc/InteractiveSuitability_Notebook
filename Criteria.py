@@ -39,6 +39,7 @@ class Criteria:
 
     def transform(self, type, params):
         if type == 'continous':
+            # RBF Small method
             if params['name'] == 'small':
                 if 'mid_point' not in params:
                     params['mid_point'] = (self.max_value + self.min_value) / 2
@@ -48,6 +49,8 @@ class Criteria:
                                                   for i in self.sample_values]
                 self.transformed_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
                                                   for i in self.values]
+
+            # RBF Large method
             if params['name'] == 'large':
                 if 'mid_point' not in params:
                     params['mid_point'] = (self.max_value + self.min_value) / 2
@@ -58,6 +61,7 @@ class Criteria:
                 self.transformed_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
                                                   for i in self.values]
 
+            # RBF MSSmall method
             if params['name'] == 'mssmall':
                 if 'mean_multiplier' not in params:
                     params['mean_multiplier'] = 1
@@ -65,10 +69,10 @@ class Criteria:
                     params['std_multiplier'] = 1
                 n_mean = params['mean_multiplier'] * self.mean_value
                 n_std = params['std_multiplier'] * self.std_value
-
                 self.transformed_sample_values = [n_std/ (i - n_mean + n_std) if i > n_mean else 1 for i in self.sample_values]
                 self.transformed_values = [n_std/ (i - n_mean + n_std) if i > n_mean else 1 for i in self.values]
 
+            # RBF MSLarge method
             if params['name'] == 'mslarge':
                 if 'mean_multiplier' not in params:
                     params['mean_multiplier'] = 1
@@ -76,9 +80,31 @@ class Criteria:
                     params['std_multiplier'] = 1
                 n_mean = params['mean_multiplier'] * self.mean_value
                 n_std = params['std_multiplier'] * self.std_value
-
                 self.transformed_sample_values = [1-n_std/ (i - n_mean + n_std) if i > n_mean else 0 for i in self.sample_values]
                 self.transformed_values = [1-n_std/ (i - n_mean + n_std) if i > n_mean else 0 for i in self.values]
+
+            # RBF Gaussion method
+            if params['name'] == 'gaussian':
+                if 'mid_point' not in params:
+                    params['mid_point'] = (self.max_value + self.min_value) / 2
+                if 'spread' not in params:
+                    params['spread'] = math.log(10) * 4 / math.pow(params['mid_point'] - self.min_value, 2)
+                self.transformed_sample_values = [math.exp(-params['spread'] * (i - params['mid_point']) ** 2) for i in self.sample_values]
+                self.transformed_values = [math.exp(-params['spread'] * (i - params['mid_point']) ** 2) for i in self.values]
+
+            # RBF Near method
+            if params['name'] == 'near':
+                if 'mid_point' not in params:
+                    params['mid_point'] = (self.max_value + self.min_value) / 2
+                if 'spread' not in params:
+                    params['spread'] = 36 / math.pow(params['mid_point'] - self.min_value, 2)
+                self.transformed_sample_values = [ 1 / ( 1+ params['spread'] * math.pow(i - params['mid_point'], 2))
+                                                   for i in self.sample_values]
+                self.transformed_values = [ 1 / ( 1+ params['spread'] * math.pow(i - params['mid_point'], 2))
+                                                   for i in self.values]
+
+
+
 
     def show_transform_plot(self, scale_min=1, scale_max=10, n_bins=20):
         self.transformed_sample_values = [(v - self.min_value) / (self.max_value - self.min_value) *
@@ -102,15 +128,11 @@ def main():
     # c1.stats()
     # c1.show_hist()
 
-    # RBF small / large
+    # RBF small / large / gaussian / near
     transform_params = {
-        'name': 'large'
+        'name': 'near'
     }
 
-    # mssmall / mslarge
-    transform_params = {
-        'name': 'mslarge'
-    }
     c1.transform('continous', transform_params)
     c1.show_transform_plot()
 
