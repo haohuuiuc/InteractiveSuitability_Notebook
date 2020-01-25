@@ -1,2 +1,6 @@
-# RBF_Notebook
-This is a notebook for implementing Rescale By Function (RBF) with arcpy raster calculator for the purposes of verifying RBF raster function results.
+# InterativeSuitability_Notebook
+This notebook re-implements the new Suitabiity Modeling in ArcGIS by using the concept of 
+on-the-fly rendering Raster Function and arcpy raster calculator. The main purpose of this project
+is to help verify new Suitability modeling results in ArcGIS Pro future release.
+
+
