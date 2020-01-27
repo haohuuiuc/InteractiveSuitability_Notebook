@@ -29,6 +29,12 @@ class Criteria:
         print('Min: {}'.format(self.min_value))
         print('Max: {}'.format(self.max_value))
 
+    def transform_stats(self):
+        v_mean = statistics.mean(self.transformed_values)
+        print('Mean: {}'.format(v_mean))
+        print('Min: {}'.format(min(self.transformed_values)))
+        print('Max: {}'.format(max(self.transformed_values)))
+
     def show_hist(self, n_bins=20):
         fig, ax1 = plt.subplots()
         ax1.hist(self.values, bins=n_bins)
@@ -48,7 +54,7 @@ class Criteria:
                 self.transformed_sample_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
                                                   for i in self.sample_values]
                 self.transformed_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
-                                                  for i in self.values]
+                                           for i in self.values]
 
             # RBF Large method
             if params['name'] == 'large':
@@ -59,7 +65,7 @@ class Criteria:
                 self.transformed_sample_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
                                                   for i in self.sample_values]
                 self.transformed_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
-                                                  for i in self.values]
+                                           for i in self.values]
 
             # RBF MSSmall method
             if params['name'] == 'mssmall':
@@ -69,8 +75,9 @@ class Criteria:
                     params['std_multiplier'] = 1
                 n_mean = params['mean_multiplier'] * self.mean_value
                 n_std = params['std_multiplier'] * self.std_value
-                self.transformed_sample_values = [n_std/ (i - n_mean + n_std) if i > n_mean else 1 for i in self.sample_values]
-                self.transformed_values = [n_std/ (i - n_mean + n_std) if i > n_mean else 1 for i in self.values]
+                self.transformed_sample_values = [n_std / (i - n_mean + n_std) if i > n_mean else 1 for i in
+                                                  self.sample_values]
+                self.transformed_values = [n_std / (i - n_mean + n_std) if i > n_mean else 1 for i in self.values]
 
             # RBF MSLarge method
             if params['name'] == 'mslarge':
@@ -80,8 +87,9 @@ class Criteria:
                     params['std_multiplier'] = 1
                 n_mean = params['mean_multiplier'] * self.mean_value
                 n_std = params['std_multiplier'] * self.std_value
-                self.transformed_sample_values = [1-n_std/ (i - n_mean + n_std) if i > n_mean else 0 for i in self.sample_values]
-                self.transformed_values = [1-n_std/ (i - n_mean + n_std) if i > n_mean else 0 for i in self.values]
+                self.transformed_sample_values = [1 - n_std / (i - n_mean + n_std) if i > n_mean else 0 for i in
+                                                  self.sample_values]
+                self.transformed_values = [1 - n_std / (i - n_mean + n_std) if i > n_mean else 0 for i in self.values]
 
             # RBF Gaussion method
             if params['name'] == 'gaussian':
@@ -89,8 +97,10 @@ class Criteria:
                     params['mid_point'] = (self.max_value + self.min_value) / 2
                 if 'spread' not in params:
                     params['spread'] = math.log(10) * 4 / math.pow(params['mid_point'] - self.min_value, 2)
-                self.transformed_sample_values = [math.exp(-params['spread'] * (i - params['mid_point']) ** 2) for i in self.sample_values]
-                self.transformed_values = [math.exp(-params['spread'] * (i - params['mid_point']) ** 2) for i in self.values]
+                self.transformed_sample_values = [math.exp(-params['spread'] * (i - params['mid_point']) ** 2) for i in
+                                                  self.sample_values]
+                self.transformed_values = [math.exp(-params['spread'] * (i - params['mid_point']) ** 2) for i in
+                                           self.values]
 
             # RBF Near method
             if params['name'] == 'near':
@@ -98,10 +108,10 @@ class Criteria:
                     params['mid_point'] = (self.max_value + self.min_value) / 2
                 if 'spread' not in params:
                     params['spread'] = 36 / math.pow(params['mid_point'] - self.min_value, 2)
-                self.transformed_sample_values = [ 1 / ( 1+ params['spread'] * math.pow(i - params['mid_point'], 2))
-                                                   for i in self.sample_values]
-                self.transformed_values = [ 1 / ( 1+ params['spread'] * math.pow(i - params['mid_point'], 2))
-                                                   for i in self.values]
+                self.transformed_sample_values = [1 / (1 + params['spread'] * math.pow(i - params['mid_point'], 2))
+                                                  for i in self.sample_values]
+                self.transformed_values = [1 / (1 + params['spread'] * math.pow(i - params['mid_point'], 2))
+                                           for i in self.values]
 
             # RBF Linear method
             if params['name'] == 'linear':
@@ -183,7 +193,7 @@ class Criteria:
                 self.transformed_sample_values = [math.exp((i - params['in_shift']) * params['base_factor'])
                                                   for i in self.transformed_sample_values]
                 self.transformed_values = [math.exp((i - params['in_shift']) * params['base_factor'])
-                                                  for i in self.transformed_values]
+                                           for i in self.transformed_values]
 
             # RBF Logarithm method
             if params['name'] == 'logarithm':
@@ -218,7 +228,8 @@ class Criteria:
                 if 'exponent' not in params:
                     params['exponent'] = exponent
 
-                self.transformed_sample_values = [math.pow(i - params['in_shift'], params['exponent']) for i in self.sample_values]
+                self.transformed_sample_values = [math.pow(i - params['in_shift'], params['exponent']) for i in
+                                                  self.sample_values]
                 self.transformed_values = [math.pow(i - params['in_shift'], params['exponent']) for i in self.values]
 
             # RBF Logistic Growth method
@@ -228,7 +239,8 @@ class Criteria:
                 c = 100
                 a = c / params['y_intercept_percent'] - 1
                 b = - math.log(a) / (0.5 * (self.max_value + self.min_value) - self.min_value)
-                self.transformed_sample_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.sample_values]
+                self.transformed_sample_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in
+                                                  self.sample_values]
                 self.transformed_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.values]
 
             # RBF Logistic Decay method
@@ -238,14 +250,23 @@ class Criteria:
                 c = 100
                 a = c / params['y_intercept_percent'] - 1
                 b = - math.log(a) / (0.5 * (self.max_value + self.min_value) - self.min_value)
-                self.transformed_sample_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.sample_values]
+                self.transformed_sample_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in
+                                                  self.sample_values]
                 self.transformed_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.values]
 
+        min_transformed_value = min(self.transformed_values)
+        max_transformed_value = max(self.transformed_values)
+        self.transformed_values = [(v - min_transformed_value) / (max_transformed_value - min_transformed_value) *
+                                   (params['to_scale'] - params['from_scale']) + params['from_scale'] for v in
+                                   self.transformed_values]
+        min_transformed_sample_value = min(self.transformed_sample_values)
+        max_transformed_sample_value = max(self.transformed_sample_values)
+        self.transformed_sample_values = [
+            (v - min_transformed_sample_value) / (max_transformed_sample_value - min_transformed_sample_value) *
+            (params['to_scale'] - params['from_scale']) + params['from_scale'] for v in
+            self.transformed_sample_values]
 
-    def show_transform_plot(self, from_scale=1, to_scale=10, n_bins=20):
-        self.transformed_sample_values = [(v - self.min_value) / (self.max_value - self.min_value) *
-                                          (to_scale - from_scale) + from_scale for v in self.transformed_sample_values]
-
+    def show_transform_plot(self, n_bins=20):
         fig, ax1 = plt.subplots()
         ax2 = ax1.twinx()
         ax1.hist(self.values, bins=n_bins)
@@ -264,15 +285,16 @@ def main():
     # c1.stats()
     # c1.show_hist()
 
-    # RBF small / large / gaussian / near
+    # RBF params
     transform_params = {
-        'name': 'logisticgrowth',
+        'name': 'mssmall',
         'from_scale': 1,
         'to_scale': 10
     }
 
     c1.transform('continous', transform_params)
     c1.show_transform_plot()
+    c1.transform_stats()
 
 
 if __name__ == "__main__":
