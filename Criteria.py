@@ -103,12 +103,148 @@ class Criteria:
                 self.transformed_values = [ 1 / ( 1+ params['spread'] * math.pow(i - params['mid_point'], 2))
                                                    for i in self.values]
 
+            # RBF Linear method
+            if params['name'] == 'linear':
+                if 'min_x' not in params:
+                    params['min_x'] = self.min_value
+                if 'max_x' not in params:
+                    params['max_x'] = self.max_value
+                diff = params['max_x'] - params['min_x']
+                y_sample = []
+                y = []
+                if diff > 0:  # positive slope
+                    for v in self.sample_values:
+                        if v < params['min_x']:
+                            y_sample.append(0)
+                        else:
+                            if v > params['max_x']:
+                                y_sample.append(1)
+                            else:
+                                y_sample.append((v - params['min_x']) / diff)
+                else:
+                    for v in self.values:
+                        if v > params['min_x']:
+                            y.append(0)
+                        else:
+                            if v < params['max_x']:
+                                y.append(1)
+                            else:
+                                y.append((v - params['min_x']) / diff)
+                self.transformed_sample_values = y_sample
+                self.transformed_values = y
+
+            # RBF Symmetric Linear method
+            if params['name'] == 'symmetriclinear':
+                if 'min_x' not in params:
+                    params['min_x'] = self.min_value
+                if 'max_x' not in params:
+                    params['max_x'] = self.max_value
+                diff = params['max_x'] - params['min_x']
+                h_diff = 0.5 * diff
+                mid_p = params['min_x'] + h_diff
+                y_sample = []
+                y = []
+                if diff > 0:  # positive slope
+                    for v in self.sample_values:
+                        if v < params['min_x']:
+                            y_sample.append(0)
+                        else:
+                            if v < mid_p:
+                                y_sample.append((v - params['min_x']) / h_diff)
+                            else:
+                                if v > params['max_x']:
+                                    y_sample.append(0)
+                                else:
+                                    y_sample.append((params['max_x'] - v) / h_diff)
+                else:
+                    for v in self.sample_values:
+                        if v < params['max_x']:
+                            y.append(1)
+                        else:
+                            if v < mid_p:
+                                y.append((v - mid_p) / h_diff)
+                            else:
+                                if v > params['min_x']:
+                                    y.append(1)
+                                else:
+                                    y.append((mid_p - v) / h_diff)
+                self.transformed_sample_values = y_sample
+                self.transformed_values = y
+
+            # RBF Exponential method
+            if params['name'] == 'exponential':
+                if 'in_shift' not in params:
+                    params['in_shift'] = (self.min_value * math.log(params['to_scale']) - self.max_value *
+                                          math.log(params['from_scale'])) / (math.log(params['to_scale']) -
+                                                                             math.log(params['from_scale']))
+                if 'base_factor' not in params:
+                    params['base_factor'] = (math.log(params['to_scale']) - math.log(params['from_scale'])) / \
+                                            (self.max_value - self.min_value)
+                self.transformed_sample_values = [math.exp((i - params['in_shift']) * params['base_factor'])
+                                                  for i in self.transformed_sample_values]
+                self.transformed_values = [math.exp((i - params['in_shift']) * params['base_factor'])
+                                                  for i in self.transformed_values]
+
+            # RBF Logarithm method
+            if params['name'] == 'logarithm':
+                if 'in_shift' not in params:
+                    params['in_shift'] = (self.min_value * math.exp(params['to_scale']) - self.max_value *
+                                          math.exp(params['from_scale'])) / (math.exp(params['to_scale']) -
+                                                                             math.exp(params['from_scale']))
+                if 'base_factor' not in params:
+                    params['base_factor'] = (math.exp(params['to_scale']) - math.exp(params['from_scale'])) / \
+                                            (self.max_value - self.min_value)
+                self.transformed_sample_values = [math.log((i - params['in_shift']) * params['base_factor'])
+                                                  for i in self.transformed_sample_values]
+                self.transformed_values = [math.log((i - params['in_shift']) * params['base_factor'])
+                                           for i in self.transformed_values]
+
+            # RBF Power method
+            if params['name'] == 'power':
+                if params['from_scale'] == 0:
+                    in_shift = self.min_value
+                    if params['to_scale'] <= 1:
+                        exponent = 1
+                    else:
+                        exponent = math.log(params['to_scale']) / (self.max_value - in_shift)
+                elif params['from_scale'] == 1:
+                    in_shift = self.min_value - 1
+                    exponent = math.log(params['to_scale']) / math.log(self.max_value - in_shift)
+                else:
+                    in_shift = self.min_value
+                    exponent = 2
+                if 'in_shift' not in params:
+                    params['in_shift'] = in_shift
+                if 'exponent' not in params:
+                    params['exponent'] = exponent
+
+                self.transformed_sample_values = [math.pow(i - params['in_shift'], params['exponent']) for i in self.sample_values]
+                self.transformed_values = [math.pow(i - params['in_shift'], params['exponent']) for i in self.values]
+
+            # RBF Logistic Growth method
+            if params['name'] == 'logisticgrowth':
+                if 'y_intercept_percent' not in params:
+                    params['y_intercept_percent'] = 1
+                c = 100
+                a = c / params['y_intercept_percent'] - 1
+                b = - math.log(a) / (0.5 * (self.max_value + self.min_value) - self.min_value)
+                self.transformed_sample_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.sample_values]
+                self.transformed_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.values]
+
+            # RBF Logistic Decay method
+            if params['name'] == 'logisticdecay':
+                if 'y_intercept_percent' not in params:
+                    params['y_intercept_percent'] = 99
+                c = 100
+                a = c / params['y_intercept_percent'] - 1
+                b = - math.log(a) / (0.5 * (self.max_value + self.min_value) - self.min_value)
+                self.transformed_sample_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.sample_values]
+                self.transformed_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.values]
 
 
-
-    def show_transform_plot(self, scale_min=1, scale_max=10, n_bins=20):
+    def show_transform_plot(self, from_scale=1, to_scale=10, n_bins=20):
         self.transformed_sample_values = [(v - self.min_value) / (self.max_value - self.min_value) *
-                                          (scale_max - scale_min) + scale_min for v in self.transformed_sample_values]
+                                          (to_scale - from_scale) + from_scale for v in self.transformed_sample_values]
 
         fig, ax1 = plt.subplots()
         ax2 = ax1.twinx()
@@ -130,7 +266,9 @@ def main():
 
     # RBF small / large / gaussian / near
     transform_params = {
-        'name': 'near'
+        'name': 'logisticgrowth',
+        'from_scale': 1,
+        'to_scale': 10
     }
 
     c1.transform('continous', transform_params)
