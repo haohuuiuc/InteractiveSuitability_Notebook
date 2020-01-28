@@ -44,6 +44,17 @@ class Criteria:
         plt.show()
 
     def transform(self, type, params):
+        if type == 'unique':
+            for idx, val in enumerate(self.transformed_values):
+                if val in params['remap']:
+                    self.transformed_values[idx] = params['remap'][val]
+
+        if type == 'range':
+            for idx, val in enumerate(self.transformed_values):
+                for s,e in params['remap']:
+                    if s < val <= e:
+                        self.transformed_values[idx] = params['remap'][(s,e)]
+
         if type == 'continous':
             # RBF Small method
             if params['name'] == 'small':
@@ -254,17 +265,26 @@ class Criteria:
                                                   self.sample_values]
                 self.transformed_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.values]
 
+            min_transformed_sample_value = min(self.transformed_sample_values)
+            max_transformed_sample_value = max(self.transformed_sample_values)
+            self.transformed_sample_values = [
+                (v - min_transformed_sample_value) / (max_transformed_sample_value - min_transformed_sample_value) *
+                (params['to_scale'] - params['from_scale']) + params['from_scale'] for v in
+                self.transformed_sample_values]
+
         min_transformed_value = min(self.transformed_values)
         max_transformed_value = max(self.transformed_values)
         self.transformed_values = [(v - min_transformed_value) / (max_transformed_value - min_transformed_value) *
                                    (params['to_scale'] - params['from_scale']) + params['from_scale'] for v in
                                    self.transformed_values]
-        min_transformed_sample_value = min(self.transformed_sample_values)
-        max_transformed_sample_value = max(self.transformed_sample_values)
-        self.transformed_sample_values = [
-            (v - min_transformed_sample_value) / (max_transformed_sample_value - min_transformed_sample_value) *
-            (params['to_scale'] - params['from_scale']) + params['from_scale'] for v in
-            self.transformed_sample_values]
+
+    def show_transform_hist(self, n_bins=20):
+        fig, ax1 = plt.subplots()
+        ax1.hist(self.transformed_values, bins=n_bins)
+        ax1.set_xlabel(self.raster.name)
+        ax1.set_ylabel('Count')
+        plt.title('Histogram of transformed {}'.format(self.raster.name))
+        plt.show()
 
     def show_transform_plot(self, n_bins=20):
         fig, ax1 = plt.subplots()
@@ -282,20 +302,66 @@ class Criteria:
 def main():
     # test code here
     c1 = Criteria(arcpy.Raster(r'\\archive\CRData\ArcGISPro\raster-analysis\SuitabilityData\dem_24'))
+    c2 = Criteria(arcpy.Raster(r'\\archive\CRData\ArcGISPro\raster-analysis\SuitabilityData\landuse2002'))
     # c1.stats()
     # c1.show_hist()
 
+
     # RBF params
-    transform_params = {
+    transform_params_continous = {
         'name': 'mssmall',
         'from_scale': 1,
         'to_scale': 10
     }
 
-    c1.transform('continous', transform_params)
-    c1.show_transform_plot()
+    # Unique transform params
+    transform_params_unique = {
+        'from_scale': 1,
+        'to_scale': 10,
+        'remap': {
+            5: 1,
+            7: 1,
+            11: 1,
+            12: 1,
+            13: 1,
+            14: 1,
+            17: 1,
+            24: 1,
+            41: 10,
+            42: 10,
+            43: 10,
+            61: 1,
+            62: 1,
+            211: 1,
+            212: 1
+        }
+    }
+    # Range transform params
+    transform_params_range = {
+        'from_scale': 1,
+        'to_scale': 10,
+        'remap': {
+            (587, 935.8): 1,
+            (935.8, 1283.6): 2,
+            (1283.6, 1631.4): 3,
+            (1631.4, 1979.2): 4,
+            (1979.2, 2327): 5,
+            (2327, 2674.8): 6,
+            (2674.8, 3022.6): 7,
+            (3022.6, 3370.4): 8,
+            (3370.4, 3718.2): 9,
+            (3718.2, 4066): 10,
+        }
+    }
+    # c1.transform('continous', transform_params_continuous)
+    # c1.show_transform_plot()
+    # c1.transform_stats()
+    # c2.transform('unique', transform_params_unique)
+    # c2.show_transform_hist()
+    # c2.transform_stats()
+    c1.transform('range', transform_params_range)
+    c1.show_transform_hist()
     c1.transform_stats()
-
 
 if __name__ == "__main__":
     main()
