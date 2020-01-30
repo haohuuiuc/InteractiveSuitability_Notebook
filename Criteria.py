@@ -7,33 +7,30 @@ import matplotlib.pyplot as plt
 class Criteria:
     def __init__(self, raster_obj):
         self.raster = raster_obj
-        # Store values in a list
-        x = []
-        for r, c in raster_obj:
-            x.append(raster_obj[r, c])
-        # exclude nodata value, may take a while depending on raster size
-        self.values = list(filter(lambda v: not math.isnan(v), x))
-        self.transformed_values = self.values.copy()
-        self.min_value = min(self.values)
-        self.max_value = max(self.values)
-        self.mean_value = statistics.mean(self.values)
-        self.std_value = statistics.stdev(self.values)
-        self.n_values = len(self.values)
-        interv = (self.max_value - self.min_value) / (100 - 1)
+        raster_info = raster_obj.getRasterInfo()
+        raster_info.setPixelType('F32')
+        self.transformed_raster = arcpy.Raster(raster_info)
+        self.scaled_transformed_raster = arcpy.Raster(raster_info)
+        self.min_value = raster_obj.minimum
+        self.max_value = raster_obj.maximum
+        self.mean_value = raster_obj.mean
+        self.std_value = raster_obj.standardDeviation
+        self.values = self.get_raster_values(raster_obj)
+        interv = (max(self.values) - min(self.values)) / (100 - 1)
         self.sample_values = [min(self.values) + i * interv for i in range(100)]
         self.transformed_sample_values = self.sample_values.copy()
 
-    def stats(self):
-        v_mean = statistics.mean(self.values)
-        print('Mean: {}'.format(v_mean))
-        print('Min: {}'.format(self.min_value))
-        print('Max: {}'.format(self.max_value))
+    def get_raster_values(self, raster):
+        x = []
+        for r, c in raster:
+            x.append(raster[r, c])
+        # exclude nodata value, may take a while depending on raster size
+        return list(filter(lambda v: not math.isnan(v), x))
 
-    def transform_stats(self):
-        v_mean = statistics.mean(self.transformed_values)
-        print('Mean: {}'.format(v_mean))
-        print('Min: {}'.format(min(self.transformed_values)))
-        print('Max: {}'.format(max(self.transformed_values)))
+    def show_stats(self, raster):
+        print('Mean: {}'.format(raster.mean))
+        print('Min: {}'.format(raster.minimum))
+        print('Max: {}'.format(raster.maximum))
 
     def show_hist(self, n_bins=20):
         fig, ax1 = plt.subplots()
@@ -45,15 +42,23 @@ class Criteria:
 
     def transform(self, type, params):
         if type == 'unique':
+            with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                for i, j in rci:
+                    old_cell_value = self.raster[i, j]
+                    if old_cell_value in params['remap']:
+                        self.transformed_raster[i, j] = params['remap'][old_cell_value]
+
             for idx, val in enumerate(self.transformed_values):
                 if val in params['remap']:
                     self.transformed_values[idx] = params['remap'][val]
 
         if type == 'range':
-            for idx, val in enumerate(self.transformed_values):
-                for s,e in params['remap']:
-                    if s < val <= e:
-                        self.transformed_values[idx] = params['remap'][(s,e)]
+            with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                for i, j in rci:
+                    old_cell_value = self.raster[i, j]
+                    for s, e in params['remap']:
+                        if s < old_cell_value <= e:
+                            self.transformed_raster[i, j] = params['remap'][(s, e)]
 
         if type == 'continous':
             # RBF Small method
@@ -64,8 +69,10 @@ class Criteria:
                     params['spread'] = 5
                 self.transformed_sample_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
                                                   for i in self.sample_values]
-                self.transformed_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
-                                           for i in self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i,j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = 1 / (1 + math.pow(old_cell_value / params['mid_point'], params['spread']))
 
             # RBF Large method
             if params['name'] == 'large':
@@ -75,8 +82,11 @@ class Criteria:
                     params['spread'] = -5
                 self.transformed_sample_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
                                                   for i in self.sample_values]
-                self.transformed_values = [1 / (1 + math.pow(i / params['mid_point'], params['spread']))
-                                           for i in self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = 1 / (
+                                    1 + math.pow(old_cell_value / params['mid_point'], params['spread']))
 
             # RBF MSSmall method
             if params['name'] == 'mssmall':
@@ -88,7 +98,10 @@ class Criteria:
                 n_std = params['std_multiplier'] * self.std_value
                 self.transformed_sample_values = [n_std / (i - n_mean + n_std) if i > n_mean else 1 for i in
                                                   self.sample_values]
-                self.transformed_values = [n_std / (i - n_mean + n_std) if i > n_mean else 1 for i in self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i,j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = n_std / (old_cell_value - n_mean + n_std) if i > n_mean else 1
 
             # RBF MSLarge method
             if params['name'] == 'mslarge':
@@ -100,7 +113,10 @@ class Criteria:
                 n_std = params['std_multiplier'] * self.std_value
                 self.transformed_sample_values = [1 - n_std / (i - n_mean + n_std) if i > n_mean else 0 for i in
                                                   self.sample_values]
-                self.transformed_values = [1 - n_std / (i - n_mean + n_std) if i > n_mean else 0 for i in self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = old_cell_value - n_std / (i - n_mean + n_std) if i > n_mean else 0
 
             # RBF Gaussion method
             if params['name'] == 'gaussian':
@@ -110,8 +126,10 @@ class Criteria:
                     params['spread'] = math.log(10) * 4 / math.pow(params['mid_point'] - self.min_value, 2)
                 self.transformed_sample_values = [math.exp(-params['spread'] * (i - params['mid_point']) ** 2) for i in
                                                   self.sample_values]
-                self.transformed_values = [math.exp(-params['spread'] * (i - params['mid_point']) ** 2) for i in
-                                           self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = math.exp(-params['spread'] * (old_cell_value - params['mid_point']) ** 2)
 
             # RBF Near method
             if params['name'] == 'near':
@@ -121,8 +139,10 @@ class Criteria:
                     params['spread'] = 36 / math.pow(params['mid_point'] - self.min_value, 2)
                 self.transformed_sample_values = [1 / (1 + params['spread'] * math.pow(i - params['mid_point'], 2))
                                                   for i in self.sample_values]
-                self.transformed_values = [1 / (1 + params['spread'] * math.pow(i - params['mid_point'], 2))
-                                           for i in self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = 1 / (1 + params['spread'] * math.pow(old_cell_value - params['mid_point'], 2))
 
             # RBF Linear method
             if params['name'] == 'linear':
@@ -133,26 +153,26 @@ class Criteria:
                 diff = params['max_x'] - params['min_x']
                 y_sample = []
                 y = []
-                if diff > 0:  # positive slope
-                    for v in self.sample_values:
-                        if v < params['min_x']:
-                            y_sample.append(0)
+                # positive slope, assume always the case
+                for v in self.sample_values:
+                    if v < params['min_x']:
+                        y_sample.append(0)
+                    else:
+                        if v > params['max_x']:
+                            y_sample.append(1)
                         else:
-                            if v > params['max_x']:
-                                y_sample.append(1)
-                            else:
-                                y_sample.append((v - params['min_x']) / diff)
-                else:
-                    for v in self.values:
-                        if v > params['min_x']:
-                            y.append(0)
+                            y_sample.append((v - params['min_x']) / diff)
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        if old_cell_value < params['min_x']:
+                            self.transformed_raster[i, j] = 0
                         else:
-                            if v < params['max_x']:
-                                y.append(1)
+                            if old_cell_value > params['max_x']:
+                                self.transformed_raster[i, j] = 1
                             else:
-                                y.append((v - params['min_x']) / diff)
+                                self.transformed_raster[i, j] = (old_cell_value - params['min_x']) / diff
                 self.transformed_sample_values = y_sample
-                self.transformed_values = y
 
             # RBF Symmetric Linear method
             if params['name'] == 'symmetriclinear':
@@ -165,32 +185,31 @@ class Criteria:
                 mid_p = params['min_x'] + h_diff
                 y_sample = []
                 y = []
-                if diff > 0:  # positive slope
-                    for v in self.sample_values:
-                        if v < params['min_x']:
-                            y_sample.append(0)
+                for v in self.sample_values:
+                    if v < params['min_x']:
+                        y_sample.append(0)
+                    else:
+                        if v < mid_p:
+                            y_sample.append((v - params['min_x']) / h_diff)
                         else:
-                            if v < mid_p:
-                                y_sample.append((v - params['min_x']) / h_diff)
+                            if v > params['max_x']:
+                                y_sample.append(0)
                             else:
-                                if v > params['max_x']:
-                                    y_sample.append(0)
-                                else:
-                                    y_sample.append((params['max_x'] - v) / h_diff)
-                else:
-                    for v in self.sample_values:
-                        if v < params['max_x']:
-                            y.append(1)
+                                y_sample.append((params['max_x'] - v) / h_diff)
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        if old_cell_value < params['min_x']:
+                            self.transformed_raster[i, j] = 0
                         else:
-                            if v < mid_p:
-                                y.append((v - mid_p) / h_diff)
+                            if old_cell_value < mid_p:
+                                self.transformed_raster[i, j] = (old_cell_value - params['min_x']) / h_diff
                             else:
-                                if v > params['min_x']:
-                                    y.append(1)
+                                if old_cell_value > params['max_x']:
+                                    self.transformed_raster[i, j] = 0
                                 else:
-                                    y.append((mid_p - v) / h_diff)
+                                    self.transformed_raster[i, j] = (params['max_x'] - old_cell_value) / h_diff
                 self.transformed_sample_values = y_sample
-                self.transformed_values = y
 
             # RBF Exponential method
             if params['name'] == 'exponential':
@@ -203,8 +222,10 @@ class Criteria:
                                             (self.max_value - self.min_value)
                 self.transformed_sample_values = [math.exp((i - params['in_shift']) * params['base_factor'])
                                                   for i in self.transformed_sample_values]
-                self.transformed_values = [math.exp((i - params['in_shift']) * params['base_factor'])
-                                           for i in self.transformed_values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = math.exp((old_cell_value - params['in_shift']) * params['base_factor'])
 
             # RBF Logarithm method
             if params['name'] == 'logarithm':
@@ -217,8 +238,11 @@ class Criteria:
                                             (self.max_value - self.min_value)
                 self.transformed_sample_values = [math.log((i - params['in_shift']) * params['base_factor'])
                                                   for i in self.transformed_sample_values]
-                self.transformed_values = [math.log((i - params['in_shift']) * params['base_factor'])
-                                           for i in self.transformed_values]
+
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = math.log((old_cell_value - params['in_shift']) * params['base_factor'])
 
             # RBF Power method
             if params['name'] == 'power':
@@ -241,7 +265,10 @@ class Criteria:
 
                 self.transformed_sample_values = [math.pow(i - params['in_shift'], params['exponent']) for i in
                                                   self.sample_values]
-                self.transformed_values = [math.pow(i - params['in_shift'], params['exponent']) for i in self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = math.pow(old_cell_value - params['in_shift'], params['exponent'])
 
             # RBF Logistic Growth method
             if params['name'] == 'logisticgrowth':
@@ -252,7 +279,10 @@ class Criteria:
                 b = - math.log(a) / (0.5 * (self.max_value + self.min_value) - self.min_value)
                 self.transformed_sample_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in
                                                   self.sample_values]
-                self.transformed_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = c / (1 + a * math.exp((old_cell_value - self.min_value) * b))
 
             # RBF Logistic Decay method
             if params['name'] == 'logisticdecay':
@@ -263,24 +293,35 @@ class Criteria:
                 b = - math.log(a) / (0.5 * (self.max_value + self.min_value) - self.min_value)
                 self.transformed_sample_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in
                                                   self.sample_values]
-                self.transformed_values = [c / (1 + a * math.exp((i - self.min_value) * b)) for i in self.values]
+                with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
+                    for i, j in rci:
+                        old_cell_value = self.raster[i, j]
+                        self.transformed_raster[i, j] = c / (1 + a * math.exp((old_cell_value - self.min_value) * b))
 
-            min_transformed_sample_value = min(self.transformed_sample_values)
-            max_transformed_sample_value = max(self.transformed_sample_values)
+
+            arcpy.CalculateStatistics_management(self.transformed_raster)
+            min_transformed_value = self.transformed_raster.minimum
+            max_transformed_value = self.transformed_raster.maximum
             self.transformed_sample_values = [
-                (v - min_transformed_sample_value) / (max_transformed_sample_value - min_transformed_sample_value) *
+                (v - min_transformed_value) / (max_transformed_value - min_transformed_value) *
                 (params['to_scale'] - params['from_scale']) + params['from_scale'] for v in
                 self.transformed_sample_values]
 
-        min_transformed_value = min(self.transformed_values)
-        max_transformed_value = max(self.transformed_values)
-        self.transformed_values = [(v - min_transformed_value) / (max_transformed_value - min_transformed_value) *
-                                   (params['to_scale'] - params['from_scale']) + params['from_scale'] for v in
-                                   self.transformed_values]
+            # Final recale
+            with arcpy.sa.RasterCellIterator({'rasters': [self.scaled_transformed_raster, self.transformed_raster]}) as rci:
+                for r, c in rci:
+                    self.scaled_transformed_raster[r, c] = (self.transformed_raster[r, c] - min_transformed_value) / (
+                        max_transformed_value - min_transformed_value) * (params['to_scale'] - params['from_scale']) + \
+                                            params['from_scale']
+            self.transformed_raster = self.scaled_transformed_raster
 
-    def show_transform_hist(self, n_bins=20):
+        # Calculate statistics
+        arcpy.CalculateStatistics_management(self.transformed_raster)
+
+    def show_transformed_hist(self, n_bins=20):
+        values = self.get_raster_values(self.transformed_raster)
         fig, ax1 = plt.subplots()
-        ax1.hist(self.transformed_values, bins=n_bins)
+        ax1.hist(values, bins=n_bins)
         ax1.set_xlabel(self.raster.name)
         ax1.set_ylabel('Count')
         plt.title('Histogram of transformed {}'.format(self.raster.name))
@@ -301,15 +342,14 @@ class Criteria:
 
 def main():
     # test code here
-    c1 = Criteria(arcpy.Raster(r'\\archive\CRData\ArcGISPro\raster-analysis\SuitabilityData\dem_24'))
+    c1 = Criteria(arcpy.Raster(r'\\haohu\share\\SuitabilityData\\dem_24'))
     c2 = Criteria(arcpy.Raster(r'\\archive\CRData\ArcGISPro\raster-analysis\SuitabilityData\landuse2002'))
     # c1.stats()
     # c1.show_hist()
 
-
     # RBF params
     transform_params_continous = {
-        'name': 'mssmall',
+        'name': 'logisticdecay',
         'from_scale': 1,
         'to_scale': 10
     }
@@ -359,9 +399,13 @@ def main():
     # c2.transform('unique', transform_params_unique)
     # c2.show_transform_hist()
     # c2.transform_stats()
-    c1.transform('range', transform_params_range)
-    c1.show_transform_hist()
-    c1.transform_stats()
+    # c1.transform('range', transform_params_range)
+    c1.transform('continous', transform_params_continous)
+    # c1.show_hist()
+    # c1.show_transformed_hist()
+    c1.show_transform_plot()
+    c1.show_stats(c1.transformed_raster)
+
 
 if __name__ == "__main__":
     main()
