@@ -1,6 +1,5 @@
 import arcpy
 import math
-import statistics
 import matplotlib.pyplot as plt
 
 
