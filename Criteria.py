@@ -47,9 +47,9 @@ class Criteria:
                     if old_cell_value in params['remap']:
                         self.transformed_raster[i, j] = params['remap'][old_cell_value]
 
-            for idx, val in enumerate(self.transformed_values):
+            for idx, val in enumerate(self.transformed_sample_values):
                 if val in params['remap']:
-                    self.transformed_values[idx] = params['remap'][val]
+                    self.transformed_sample_values[idx] = params['remap'][val]
 
         if type == 'range':
             with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
