@@ -100,7 +100,7 @@ class Criteria:
                 with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
                     for i,j in rci:
                         old_cell_value = self.raster[i, j]
-                        self.transformed_raster[i, j] = n_std / (old_cell_value - n_mean + n_std) if i > n_mean else 1
+                        self.transformed_raster[i, j] = n_std / (old_cell_value - n_mean + n_std) if old_cell_value > n_mean else 1
 
             # RBF MSLarge method
             if params['name'] == 'mslarge':
@@ -115,7 +115,7 @@ class Criteria:
                 with arcpy.sa.RasterCellIterator({'rasters': [self.raster, self.transformed_raster]}) as rci:
                     for i, j in rci:
                         old_cell_value = self.raster[i, j]
-                        self.transformed_raster[i, j] = old_cell_value - n_std / (i - n_mean + n_std) if i > n_mean else 0
+                        self.transformed_raster[i, j] = old_cell_value - n_std / (old_cell_value - n_mean + n_std) if old_cell_value > n_mean else 0
 
             # RBF Gaussion method
             if params['name'] == 'gaussian':
