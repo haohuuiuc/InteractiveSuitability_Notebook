@@ -5,6 +5,7 @@ class SuitabilityModel:
     def __init__(self, weight_method='multiplier', from_scale=1, to_scale=10):
         self.criteria = []
         self.weight = []
+        self.weight_method = weight_method
         self.suitability_values = []
         self.from_scale = from_scale
         self.to_scale = to_scale
@@ -17,10 +18,15 @@ class SuitabilityModel:
 
     def calculate(self):
         raster_weight_list = []
+
         for i in range(len(self.criteria)):
-            raster_weight_list.append([self.criteria[i].transformed_raster, 'VALUE', self.weight[i]])
+            if self.weight_method == 'multiplier':
+                raster_weight_list.append([self.criteria[i].transformed_raster, 'VALUE', self.weight[i]])
+            else:
+                raster_weight_list.append([self.criteria[i].transformed_raster, 'VALUE', self.weight[i]/ 100])
         WSumTableObj  = arcpy.sa.WSTable(raster_weight_list)
         self.suitability_map = arcpy.sa.WeightedSum(WSumTableObj)
+
         x = []
         for r, c in self.suitability_map:
             x.append(self.suitability_map[r, c])
